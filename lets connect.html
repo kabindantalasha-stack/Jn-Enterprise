@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JN Enterprise – Digital Presence, Redefined</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
+  canvas { display: block; }
+
+  #ui-overlay {
+    position: fixed; inset: 0; pointer-events: none;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    z-index: 10;
+  }
+
+  .scene-label {
+    position: absolute; top: 32px; left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.35);
+    font-size: 11px; letter-spacing: 4px; text-transform: uppercase;
+    transition: opacity 1s;
+  }
+
+  .main-card {
+    text-align: center;
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 1.2s ease, transform 1.2s ease;
+  }
+  .main-card.visible { opacity: 1; transform: translateY(0); }
+
+  .eyebrow {
+    font-size: 10px; letter-spacing: 6px; text-transform: uppercase;
+    color: #7DF9D0; margin-bottom: 18px;
+  }
+  .headline {
+    font-size: clamp(36px, 6vw, 84px);
+    font-weight: 800; line-height: 1.05;
+    color: #fff;
+    text-shadow: 0 0 80px rgba(125,249,208,0.25);
+  }
+  .headline span { color: #7DF9D0; }
+  .sub {
+    margin-top: 20px;
+    font-size: clamp(13px, 1.6vw, 18px);
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.5px;
+    max-width: 480px;
+  }
+  .cta {
+    margin-top: 40px;
+    display: inline-block;
+    padding: 14px 38px;
+    border: 1.5px solid #7DF9D0;
+    border-radius: 4px;
+    color: #7DF9D0;
+    font-size: 12px; letter-spacing: 3px; text-transform: uppercase;
+    background: rgba(125,249,208,0.06);
+    cursor: pointer; pointer-events: all;
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .cta:hover {
+    background: rgba(125,249,208,0.14);
+    box-shadow: 0 0 24px rgba(125,249,208,0.3);
+  }
+
+  /* Stat cards that fly in during act 2 */
+  .stats {
+    position: absolute; bottom: 48px;
+    display: flex; gap: 40px;
+    opacity: 0; transition: opacity 1.5s;
+  }
+  .stats.visible { opacity: 1; }
+  .stat {
+    text-align: center;
+  }
+  .stat-num {
+    font-size: 32px; font-weight: 800; color: #7DF9D0;
+  }
+  .stat-label {
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    color: rgba(255,255,255,0.4); margin-top: 4px;
+  }
+
+  /* Progress bar */
+  #progress {
+    position: fixed; bottom: 0; left: 0;
+    height: 2px; background: #7DF9D0;
+    width: 0%; transition: width 0.1s linear;
+    z-index: 20; box-shadow: 0 0 8px #7DF9D0;
+  }
+
+  /* Skip / replay */
+  #controls {
+    position: fixed; bottom: 24px; right: 28px;
+    z-index: 20; display: flex; gap: 12px;
+  }
+  #controls button {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.5);
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    padding: 8px 16px; border-radius: 3px; cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  #controls button:hover {
+    background: rgba(125,249,208,0.12); color: #7DF9D0;
+  }
+
+  /* Logo top-left */
+  #logo {
+    position: fixed; top: 28px; left: 32px; z-index: 20;
+    font-size: 14px; font-weight: 800; letter-spacing: 2px;
+    color: #fff; opacity: 0; transition: opacity 1s;
+  }
+  #logo span { color: #7DF9D0; }
+  #logo.visible { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="logo">JN<span>.</span>Enterprise</div>
+
+<div id="ui-overlay">
+  <div class="scene-label" id="scene-label">Initializing</div>
+
+  <div class="main-card" id="main-card">
+    <div class="eyebrow" id="eyebrow">Zambia's Digital Partner</div>
+    <div class="headline" id="headline">
+      Your Business.<br><span>Online. Powerful.</span>
+    </div>
+    <div class="sub" id="sub">
+      We build websites, web apps & digital systems that put Zambian businesses on the global map.
+    </div>
+    <div class="cta" id="cta">Establish Your Presence</div>
+  </div>
+
+  <div class="stats" id="stats">
+    <div class="stat"><div class="stat-num" id="s1">0+</div><div class="stat-label">Sites Launched</div></div>
+    <div class="stat"><div class="stat-num" id="s2">0%</div><div class="stat-label">Client Satisfaction</div></div>
+    <div class="stat"><div class="stat-num" id="s3">0x</div><div class="stat-label">Faster to Market</div></div>
+  </div>
+</div>
+
+<div id="progress"></div>
+<div id="controls">
+  <button id="btn-replay">↺ Replay</button>
+  <button id="btn-skip">Skip →</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ─── SCENE SETUP ────────────────────────────────────────────────────
+const W = window.innerWidth, H = window.innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000510, 0.022);
+
+const camera = new THREE.PerspectiveCamera(60, W / H, 0.1, 300);
+camera.position.set(0, 2, 18);
+
+// ─── LIGHTS ─────────────────────────────────────────────────────────
+const ambient = new THREE.AmbientLight(0x0a1a2a, 1.2);
+scene.add(ambient);
+
+const teal = new THREE.PointLight(0x7DF9D0, 3, 40);
+teal.position.set(0, 8, 0);
+scene.add(teal);
+
+const blue = new THREE.PointLight(0x0044ff, 2, 50);
+blue.position.set(-12, 4, -10);
+scene.add(blue);
+
+const warm = new THREE.PointLight(0xff6b35, 1.5, 30);
+warm.position.set(10, -2, 5);
+scene.add(warm);
+
+// ─── GRID FLOOR ─────────────────────────────────────────────────────
+const gridHelper = new THREE.GridHelper(120, 60, 0x0a2a3a, 0x051520);
+gridHelper.position.y = -6;
+scene.add(gridHelper);
+
+// ─── FLOATING CUBES ─────────────────────────────────────────────────
+const cubes = [];
+const cubeMat = new THREE.MeshStandardMaterial({
+  color: 0x0d2233,
+  metalness: 0.9,
+  roughness: 0.1,
+  emissive: 0x7DF9D0,
+  emissiveIntensity: 0.04,
+  transparent: true,
+  opacity: 0.85,
+});
+
+for (let i = 0; i < 38; i++) {
+  const s = 0.15 + Math.random() * 0.7;
+  const geo = new THREE.BoxGeometry(s, s, s);
+  const mat = cubeMat.clone();
+  mat.emissiveIntensity = Math.random() * 0.08;
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(
+    (Math.random() - 0.5) * 40,
+    (Math.random() - 0.5) * 20,
+    (Math.random() - 0.5) * 30
+  );
+  mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+  mesh.castShadow = true;
+  scene.add(mesh);
+  cubes.push({
+    mesh,
+    speed: { x: (Math.random()-0.5)*0.003, y: (Math.random()-0.5)*0.003, z: (Math.random()-0.5)*0.003 },
+    rot:   { x: (Math.random()-0.5)*0.006, y: (Math.random()-0.5)*0.008, z: (Math.random()-0.5)*0.005 },
+    baseY: mesh.position.y,
+    phase: Math.random() * Math.PI * 2,
+  });
+}
+
+// ─── CENTRAL GLOBE ──────────────────────────────────────────────────
+const sphereGeo = new THREE.SphereGeometry(3.2, 64, 64);
+const sphereMat = new THREE.MeshStandardMaterial({
+  color: 0x021824,
+  metalness: 1,
+  roughness: 0.12,
+  emissive: 0x7DF9D0,
+  emissiveIntensity: 0.07,
+  wireframe: false,
+});
+const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+sphere.position.set(0, 0, -2);
+scene.add(sphere);
+
+// wireframe overlay on globe
+const wireMat = new THREE.MeshBasicMaterial({ color: 0x7DF9D0, wireframe: true, transparent: true, opacity: 0.10 });
+const wire = new THREE.Mesh(new THREE.SphereGeometry(3.22, 24, 24), wireMat);
+sphere.add(wire);
+
+// Orbiting ring 1
+const ring1Geo = new THREE.TorusGeometry(4.5, 0.04, 8, 120);
+const ring1Mat = new THREE.MeshBasicMaterial({ color: 0x7DF9D0, transparent: true, opacity: 0.35 });
+const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
+ring1.rotation.x = Math.PI / 2.2;
+sphere.add(ring1);
+
+// Orbiting ring 2
+const ring2Geo = new THREE.TorusGeometry(5.5, 0.025, 8, 120);
+const ring2Mat = new THREE.MeshBasicMaterial({ color: 0x4499ff, transparent: true, opacity: 0.2 });
+const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+ring2.rotation.x = Math.PI / 3.5;
+ring2.rotation.z = 0.6;
+sphere.add(ring2);
+
+// ─── PARTICLE FIELD ─────────────────────────────────────────────────
+const pCount = 1800;
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(pCount * 3);
+for (let i = 0; i < pCount; i++) {
+  pPos[i*3]   = (Math.random()-0.5)*100;
+  pPos[i*3+1] = (Math.random()-0.5)*60;
+  pPos[i*3+2] = (Math.random()-0.5)*80;
+}
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const pMat = new THREE.PointsMaterial({ color: 0x7DF9D0, size: 0.08, transparent: true, opacity: 0.55 });
+const particles = new THREE.Points(pGeo, pMat);
+scene.add(particles);
+
+// ─── GLOWING LINES (data streams) ───────────────────────────────────
+function makeStream(from, to, color) {
+  const pts = [new THREE.Vector3(...from), new THREE.Vector3(...to)];
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.3 });
+  return new THREE.Line(geo, mat);
+}
+const streamColors = [0x7DF9D0, 0x4499ff, 0xff6b35];
+for (let i = 0; i < 18; i++) {
+  const a = [(Math.random()-0.5)*30, (Math.random()-0.5)*15, (Math.random()-0.5)*20];
+  const b = [(Math.random()-0.5)*30, (Math.random()-0.5)*15, (Math.random()-0.5)*20];
+  scene.add(makeStream(a, b, streamColors[i % 3]));
+}
+
+// ─── TIMELINE / ACTS ────────────────────────────────────────────────
+const DURATION = 28000; // ms
+let startTime = null;
+let running = true;
+let t = 0;
+
+const logo = document.getElementById('logo');
+const mainCard = document.getElementById('main-card');
+const sceneLabel = document.getElementById('scene-label');
+const stats = document.getElementById('stats');
+const progress = document.getElementById('progress');
+const eyebrow = document.getElementById('eyebrow');
+const headline = document.getElementById('headline');
+const sub = document.getElementById('sub');
+const cta = document.getElementById('cta');
+
+const acts = [
+  // ACT 0 – 0s: Black open, logo fades, cubes drift in
+  { at: 0,    fn: () => {
+    logo.classList.add('visible');
+    sceneLabel.textContent = 'ACT I — ARRIVAL';
+  }},
+  // ACT 1 – 2s: Main headline flies in
+  { at: 2000, fn: () => {
+    eyebrow.textContent = "Zambia's Digital Partner";
+    headline.innerHTML = 'Your Business.<br><span>Online. Powerful.</span>';
+    sub.textContent = 'We build websites, web apps & digital systems that put Zambian businesses on the global map.';
+    mainCard.classList.add('visible');
+  }},
+  // ACT 2 – 7s: Globe zooms to centre
+  { at: 7000, fn: () => {
+    sceneLabel.textContent = 'ACT II — THE PLATFORM';
+  }},
+  // ACT 3 – 11s: Text shifts to services
+  { at: 11000, fn: () => {
+    mainCard.classList.remove('visible');
+    setTimeout(() => {
+      eyebrow.textContent = 'What We Build';
+      headline.innerHTML = 'Websites. <span>Web Apps.</span><br>Digital Systems.';
+      sub.textContent = 'From e-commerce stores with payment integration to custom platforms — built fast, built right.';
+      mainCard.classList.add('visible');
+    }, 700);
+  }},
+  // ACT 4 – 17s: Stats fly in
+  { at: 17000, fn: () => {
+    sceneLabel.textContent = 'ACT III — RESULTS';
+    mainCard.classList.remove('visible');
+    stats.classList.add('visible');
+    animateCount('s1', 0, 25, '+', 1800);
+    animateCount('s2', 0, 100, '%', 2000);
+    animateCount('s3', 0, 5, 'x', 1600);
+  }},
+  // ACT 5 – 22s: Final CTA
+  { at: 22000, fn: () => {
+    sceneLabel.textContent = 'ACT IV — YOUR MOVE';
+    stats.classList.remove('visible');
+    setTimeout(() => {
+      eyebrow.textContent = 'JN Enterprise — Lusaka, Zambia';
+      headline.innerHTML = 'Ready to <span>Go Digital?</span>';
+      sub.textContent = 'Let\'s build something that works as hard as you do.';
+      mainCard.classList.add('visible');
+      cta.style.display = 'inline-block';
+    }, 700);
+  }},
+];
+
+function animateCount(id, from, to, suffix, dur) {
+  const el = document.getElementById(id);
+  const start = performance.now();
+  function tick(now) {
+    const p = Math.min((now - start) / dur, 1);
+    el.textContent = Math.round(from + (to - from) * easeOut(p)) + suffix;
+    if (p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+let actIdx = 0;
+function checkActs(elapsed) {
+  while (actIdx < acts.length && elapsed >= acts[actIdx].at) {
+    acts[actIdx].fn();
+    actIdx++;
+  }
+}
+
+// ─── CAMERA KEYFRAMES ───────────────────────────────────────────────
+// [time_ms, x, y, z, lookAtX, lookAtY, lookAtZ]
+const camKeys = [
+  [0,      0,  2,  18,  0, 0, 0],
+  [3000,   2,  1.5, 14,  0, 0, 0],
+  [8000,  -3,  1,   10,  0, 0.5, 0],
+  [13000,  4,  2,   12,  0, 0, 0],
+  [18000,  0,  3,   16,  0, 0, 0],
+  [23000,  0,  1,   13,  0, 0, 0],
+  [28000,  0,  1.5, 14,  0, 0, 0],
+];
+
+function lerpCam(elapsed) {
+  for (let i = 0; i < camKeys.length - 1; i++) {
+    const [t0, x0, y0, z0, lx0, ly0, lz0] = camKeys[i];
+    const [t1, x1, y1, z1, lx1, ly1, lz1] = camKeys[i + 1];
+    if (elapsed >= t0 && elapsed <= t1) {
+      const p = easeOut((elapsed - t0) / (t1 - t0));
+      camera.position.set(
+        x0 + (x1 - x0) * p,
+        y0 + (y1 - y0) * p,
+        z0 + (z1 - z0) * p,
+      );
+      camera.lookAt(
+        lx0 + (lx1 - lx0) * p,
+        ly0 + (ly1 - ly0) * p,
+        lz0 + (lz1 - lz0) * p,
+      );
+      break;
+    }
+  }
+}
+
+// ─── RENDER LOOP ────────────────────────────────────────────────────
+function animate(now) {
+  requestAnimationFrame(animate);
+
+  if (!startTime) startTime = now;
+  const elapsed = now - startTime;
+  t = elapsed / 1000;
+
+  if (running) {
+    checkActs(elapsed);
+    lerpCam(elapsed);
+    progress.style.width = Math.min(elapsed / DURATION * 100, 100) + '%';
+    if (elapsed >= DURATION) running = false;
+  }
+
+  // Animate cubes
+  cubes.forEach((c, i) => {
+    c.mesh.rotation.x += c.rot.x;
+    c.mesh.rotation.y += c.rot.y;
+    c.mesh.rotation.z += c.rot.z;
+    c.mesh.position.y = c.baseY + Math.sin(t * 0.4 + c.phase) * 0.6;
+  });
+
+  // Rotate globe + rings
+  sphere.rotation.y += 0.003;
+  ring1.rotation.z += 0.004;
+  ring2.rotation.y += 0.006;
+  wire.rotation.y -= 0.002;
+  wire.rotation.z += 0.001;
+
+  // Pulse teal light
+  teal.intensity = 2.5 + Math.sin(t * 1.2) * 0.8;
+  teal.position.x = Math.sin(t * 0.3) * 5;
+  teal.position.z = Math.cos(t * 0.3) * 5;
+
+  // Drift particles
+  particles.rotation.y += 0.0003;
+  particles.rotation.x += 0.0001;
+
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+
+// ─── CONTROLS ───────────────────────────────────────────────────────
+document.getElementById('btn-replay').addEventListener('click', () => {
+  startTime = null;
+  actIdx = 0;
+  running = true;
+  // reset UI
+  mainCard.classList.remove('visible');
+  stats.classList.remove('visible');
+  logo.classList.remove('visible');
+  progress.style.width = '0%';
+  cta.style.display = 'inline-block';
+});
+
+document.getElementById('btn-skip').addEventListener('click', () => {
+  if (startTime) startTime -= (DURATION - 500);
+});
+
+// ─── RESIZE ─────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+});
+</script>
+</body>
+</html>
